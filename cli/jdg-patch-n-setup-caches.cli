@@ -1,0 +1,7 @@
+connect
+/subsystem=infinispan/cache-container=clustered/distributed-cache=aliasCache:add(mode=SYNC,indexing=ALL)
+/subsystem=infinispan/cache-container=clustered/distributed-cache=booksIndexed:add(mode=SYNC,indexing=ALL)
+/subsystem=infinispan/cache-container=clustered/distributed-cache=booksIndexedStaging:add(mode=SYNC,indexing=ALL)
+patch apply ../../../../patches/jboss-datagrid-6.6.1-server-patch.zip
+shutdown --restart=true
+disconnect

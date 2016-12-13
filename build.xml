@@ -1,0 +1,201 @@
+<project name="jboss-data-virtualization" default="setup-jdg" basedir=".">
+
+	<taskdef resource="net/sf/antcontrib/antlib.xml"/>
+	<loadproperties srcFile="build.properties"/>
+
+	<description>
+        This project automates the deployment of all the necessary components 
+        to demonstrate external materialization from JBoss Data Virtualization (version: ${jdv.version})
+        into JBoss Data Grid (verison: ${jdg.version})
+    </description>
+
+	<!-- Set necessary properties -->
+	<property name="patches" location="${patches.relative}"/>
+	<property name="target" location="${target.relative}"/>
+	<property name="install-configs" location="${install-configs.relative}"/>
+	<property name="binaries" location="${binaries.relative}"/>
+	<property name="jdg.home" location="${jdg.home.relative}"/>
+	<property name="jdv.home" location="${jdv.home.relative}"/>
+	<property name="cli" location="${cli.relative}"/>
+
+	<osfamily property="os.family"/>
+
+	<target name="start-jdg-server">
+		<echo message="Starting the JBoss JDG ${jdg.version} server in clustered mode"/>
+		<if>
+			<equals arg1="${os.family}" arg2="unix" />
+			<then>
+				<exec dir="${jdg.home}/bin" executable="sh" spawn="true">
+					<arg line="clustered.sh -Djboss.socket.binding.port-offset=100"/>
+				</exec>
+			</then>
+			<elseif>
+				<equals arg1="${os.family}" arg2="windows" />
+				<then>
+					<exec dir="${jdg.home}/bin" executable="cmd" spawn="true">
+						<env key="PATH" path="${env.PATH};C:\WINDOWS\system32"/>
+						<arg line="/c clustered.bat -Djboss.socket.binding.port-offset=100"/>
+					</exec>
+				</then>
+			</elseif>
+		</if>
+	</target>
+	
+	<target name="start-jdv-server">
+		<echo message="Starting the JBoss JDV ${jdv.version} server in standalone mode"/>
+		<if>
+			<equals arg1="${os.family}" arg2="unix" />
+			<then>
+				<exec dir="${jdv.home}/bin" executable="sh" spawn="true">
+					<arg line="standalone.sh"/>
+				</exec>
+			</then>
+			<elseif>
+				<equals arg1="${os.family}" arg2="windows" />
+				<then>
+					<exec dir="${jdv.home}/bin" executable="cmd" spawn="true">
+						<env key="PATH" path="${env.PATH};C:\WINDOWS\system32"/>
+						<arg line="/c standalone.bat"/>
+					</exec>
+				</then>
+			</elseif>
+		</if>
+	</target>
+	
+	<target name="stop-jdg-server">
+		<echo message="Stopping the JDG ${jdg.version} server"/>
+		<if>
+			<equals arg1="${os.family}" arg2="unix" />
+			<then>
+				<exec dir="${jdv.home}/bin" executable="sh" spawn="true">
+					<arg line="jboss-cli.sh -c --controller=127.0.0.1:10099 --command=shutdown"/>
+				</exec>
+			</then>
+			<elseif>
+				<equals arg1="${os.family}" arg2="windows" />
+				<then>
+					<exec dir="${jdv.home}/bin" executable="cmd" spawn="true">
+						<env key="PATH" path="${env.PATH};C:\WINDOWS\system32"/>
+						<arg line="/c jboss-cli.bat -c --controller=127.0.0.1:10099 --command=shutdown"/>
+					</exec>
+				</then>
+			</elseif>
+		</if>
+	</target>
+	
+	<target name="stop-jdv-server">
+		<echo message="Stopping the JDV ${jdv.version} server"/>
+		<if>
+			<equals arg1="${os.family}" arg2="unix" />
+			<then>
+				<exec dir="${jdv.home}/bin" executable="sh" spawn="true">
+					<arg line="jboss-cli.sh -c --command=shutdown"/>
+				</exec>
+			</then>
+			<elseif>
+				<equals arg1="${os.family}" arg2="windows" />
+				<then>
+					<exec dir="${jdv.home}/bin" executable="cmd" spawn="true">
+						<env key="PATH" path="${env.PATH};C:\WINDOWS\system32"/>
+						<arg line="/c jboss-cli.bat -c --command=shutdown"/>
+					</exec>
+				</then>
+			</elseif>
+		</if>
+	</target>
+
+	<target name="clean-jdg">
+		<echo message="Cleaning the ${target}/jdg folder"/>
+		<delete quiet="true" includeemptydirs="true">
+			<fileset dir="${target}/jdg" includes="**/*" excludes="*.md"/>
+		</delete>
+	</target>
+
+	<target name="unzip-jdg" depends="clean-jdg">
+		<echo message="Installing JDG ${jdg.version}"/>
+		<unzip src="${binaries}/jboss-datagrid-${jdg.version}-server.zip" dest="${target}/jdg" />
+		<chmod perm="ugo+rx">
+			<fileset dir="${jdg.home}/bin">
+				<include name="**/*.sh"/>
+				<include name="**/*.bat"/>
+			</fileset>
+		</chmod>
+	</target>
+
+	<target name="patch-n-setup-caches" depends="unzip-jdg,start-jdg-server" unless="skipPatching">
+		<echo message="Sleeping for ${jdg.start.sleep} seconds"/>
+		<sleep seconds="${jdg.start.sleep}"/>
+		<echo message="Patching JBoss JDG ${jdg.version} server in standalone mode"/>
+		<if>
+			<equals arg1="${os.family}" arg2="unix" />
+			<then>
+				<exec dir="${jdg.home}/bin" executable="sh">
+					<env key="JBOSS_HOME" value="${jdg.home}"/>
+					<arg line="cli.sh -c 127.0.0.1:10099 --file=${cli}/jdg-patch-n-setup-caches.cli"/>
+				</exec>
+			</then>
+			<elseif>
+				<equals arg1="${os.family}" arg2="windows" />
+				<then>
+					<exec dir="${jdg.home}/bin" executable="cmd">
+						<env key="JBOSS_HOME" value="${jdg.home}"/>
+						<env key="PATH" path="${env.PATH};C:\WINDOWS\system32"/>
+						<arg line="/c cli.bat -c 127.0.0.1:10099 --file=${cli}\jdg-patch-n-setup-caches.cli"/>
+					</exec>
+				</then>
+			</elseif>
+		</if>
+	</target>
+
+    <target name="setup-jdg" depends="patch-n-setup-caches"/>
+
+    <target name="clean-jdv">
+        <echo message="Cleaning the ${target} folder"/>
+        <delete quiet="true" includeemptydirs="true">
+            <fileset dir="${target}/jdv" includes="**/*" excludes="*.md"/>
+        </delete>
+    </target>
+
+	<target name="install-jdv" depends="clean-jdv">
+		<echo message="Installing JDV ${jdv.version} server"/>
+		<java jar="${binaries}/jboss-dv-${jdv.installer.version}-installer.jar" fork="true" failonerror="true">
+			<arg value="${install-configs}/dv-${jdv.version}-installation-config.xml"/>
+		</java>
+	</target>
+
+	<target name="unzip-jdg-modules" depends="install-jdv">
+		<echo message="Unzipping JDG EAP Hotrod modules into JDV"/>
+		<unzip src="${binaries}/jboss-datagrid-${jdg.patch.version}-eap-modules-remote-java-client.zip" dest="${target}" />
+		<copy todir="${jdv.home}/modules">
+			<fileset dir="${target}/jboss-datagrid-${jdg.patch.version}-eap-modules-remote-java-client/modules"/>
+		</copy>
+	</target>
+
+	<target name="add-translator-ra" depends="unzip-jdg-modules, start-jdv-server">
+		<echo message="Sleeping for ${jdg.start.sleep} seconds"/>
+		<sleep seconds="${jdg.start.sleep}"/>
+		<echo message="Adding infispan translator and resource adapter"/>
+		<if>
+			<equals arg1="${os.family}" arg2="unix" />
+			<then>
+				<exec dir="${jdv.home}/bin" executable="sh">
+					<env key="JBOSS_HOME" value="${jdv.home}"/>
+					<arg line="jboss-cli.sh -c --file=${cli}/setup-translators-ra.cli"/>
+				</exec>
+			</then>
+			<elseif>
+				<equals arg1="${os.family}" arg2="windows" />
+				<then>
+					<exec dir="${jdv.home}/bin" executable="cmd">
+						<env key="JBOSS_HOME" value="${jdv.home}"/>
+						<env key="PATH" path="${env.PATH};C:\WINDOWS\system32"/>
+						<arg line="/c jboss-cli.bat -c --file=${cli}\setup-translators-ra.cli"/>
+					</exec>
+				</then>
+			</elseif>
+		</if>
+	</target>
+    
+    <target name="setup-jdv" depends="add-translator-ra"/>
+
+</project>
