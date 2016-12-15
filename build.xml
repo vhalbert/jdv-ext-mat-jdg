@@ -158,7 +158,7 @@
 
 	<target name="install-jdv" depends="clean-jdv">
 		<echo message="Installing JDV ${jdv.version} server"/>
-		<java jar="${binaries}/jboss-dv-${jdv.installer.version}-installer.jar" fork="true" failonerror="true">
+		<java jar="${binaries}/jboss-dv-installer-${jdv.installer.version}.jar" fork="true" failonerror="true">
 			<arg value="${install-configs}/dv-${jdv.version}-installation-config.xml"/>
 		</java>
 	</target>
